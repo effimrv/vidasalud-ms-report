@@ -113,8 +113,8 @@ public class KafkaAdminService {
 
     public List<GrupoConsumoResponse> listarGruposDeConsumo() {
         return ejecutar(admin -> admin.listConsumerGroups().all().get(TIMEOUT_SEGUNDOS, TimeUnit.SECONDS).stream()
-                .map(g -> new GrupoConsumoResponse(g.groupId(), g.state().map(Enum::name).orElse("DESCONOCIDO")))
-                .sorted(Comparator.comparing(GrupoConsumoResponse::grupo))
+                .map(g -> new GrupoConsumoResponse(g.groupId(), g.state().map(estado -> estado.name()).orElse("DESCONOCIDO")))
+                .sorted(Comparator.comparing(grupo -> grupo.grupo()))
                 .toList());
     }
 
@@ -138,8 +138,8 @@ public class KafkaAdminService {
                 long fin = finales.get(tp).offset();
                 particiones.add(new LagParticion(tp.topic(), tp.partition(), consumido, fin, Math.max(0L, fin - consumido)));
             });
-            particiones.sort(Comparator.comparing(LagParticion::topico).thenComparingInt(LagParticion::particion));
-            long lagTotal = particiones.stream().mapToLong(LagParticion::lag).sum();
+            particiones.sort(Comparator.comparing((LagParticion lp) -> lp.topico()).thenComparingInt(lp -> lp.particion()));
+            long lagTotal = particiones.stream().mapToLong(lp -> lp.lag()).sum();
             return new LagGrupoResponse(grupo, particiones, lagTotal);
         });
     }
@@ -158,7 +158,7 @@ public class KafkaAdminService {
                 configuracion.put(entrada.name(), entrada.value());
             }
         }
-        int replicas = descripcion.partitions().stream().findFirst().map(TopicPartitionInfo::replicas).map(List::size).orElse(0);
+        int replicas = descripcion.partitions().stream().findFirst().map(info -> info.replicas()).map(nodos -> nodos.size()).orElse(0);
         return new TopicoResponse(nombre, descripcion.partitions().size(), replicas, configuracion);
     }
 
