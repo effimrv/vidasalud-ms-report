@@ -1,0 +1,74 @@
+server:
+  port: 8084
+
+spring:
+  application:
+    name: vidasalud-ms-report
+  kafka:
+    # Brokers del clúster (docker-compose de vidasalud-infra). Dentro de Docker: kafka1:29092,kafka2:29092,kafka3:29092.
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092,localhost:9093,localhost:9094}
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # ErrorHandlingDeserializer: un JSON malformado no detiene el consumidor; se envía al DLT.
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      auto-offset-reset: earliest
+      max-poll-records: 100
+      heartbeat-interval: 3s
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.value.default.type: com.vidasalud.report.eventos.CitaEvento
+        spring.json.trusted.packages: com.vidasalud.report.eventos
+        spring.json.use.type.headers: false
+        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
+        session.timeout.ms: 30000
+        max.poll.interval.ms: 300000
+    producer:
+      # Solo se usa para republicar en el DLT los mensajes que no se pudieron procesar.
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      properties:
+        spring.json.add.type.headers: false
+    listener:
+      # Confirma (commit) cada registro solo cuando el listener terminó sin error.
+      ack-mode: record
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          jwk-set-uri: https://login.microsoftonline.com/49cd374a-62d5-4d3d-851e-69058d58e3b5/discovery/v2.0/keys
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: always
+
+vidasalud:
+  jwt:
+    emisores: https://login.microsoftonline.com/49cd374a-62d5-4d3d-851e-69058d58e3b5/v2.0,https://sts.windows.net/49cd374a-62d5-4d3d-851e-69058d58e3b5/
+    audiencias: 2c70c5bc-6b56-4564-bca4-ec0821f3cefa,api://2c70c5bc-6b56-4564-bca4-ec0821f3cefa
+  seguridad:
+    habilitada: ${SEGURIDAD_HABILITADA:true}
+  # Tópicos y grupos de consumo. Los nombres son los mismos que declara ms-appointments (productor).
+  kafka:
+    topicos:
+      citas:
+        nombre: appointments.events
+        # Sufijo del tópico de mensajes no procesables (Dead Letter Topic).
+        sufijo-dlt: .DLT
+        particiones: 3
+        replicas: 3
+      timeline:
+        nombre: audit.timeline
+    grupos:
+      # Grupo propio: ms-audit tiene su propio grupo, así cada servicio recibe todos los eventos.
+      reporte: vidasalud-report
+      reporteTimeline: vidasalud-report-timeline
+    reintentos:
+      # Reintentos ante error transitorio (1 intento inicial + 2 reintentos) antes de enviar al DLT.
+      intervalo-ms: 1000
+      maximo: 2
