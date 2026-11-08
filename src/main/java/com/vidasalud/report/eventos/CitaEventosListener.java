@@ -45,7 +45,7 @@ public class CitaEventosListener implements ConsumerSeekAware {
     @Override
     public void onPartitionsAssigned(Map<TopicPartition, Long> asignaciones, ConsumerSeekCallback callback) {
         Set<TopicPartition> nuevas = asignaciones.keySet().stream()
-                .filter(reprocesadas::add)
+                .filter(tp -> reprocesadas.add(tp))
                 .collect(Collectors.toSet());
         if (!nuevas.isEmpty()) {
             callback.seekToBeginning(nuevas);
