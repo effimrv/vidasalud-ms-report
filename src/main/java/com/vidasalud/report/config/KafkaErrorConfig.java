@@ -15,9 +15,11 @@ import org.springframework.kafka.listener.CommonErrorHandler;
 import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
 import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.DeserializationException;
+import org.springframework.lang.NonNull;
 import org.springframework.util.backoff.FixedBackOff;
 
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Manejo de mensajes no procesables: se reintenta el error transitorio; si se agotan los reintentos,
@@ -28,6 +30,12 @@ import java.util.Map;
 public class KafkaErrorConfig {
 
     private static final Logger log = LoggerFactory.getLogger(KafkaErrorConfig.class);
+
+    /** Excepciones que no mejoran con reintentos: van directo al DLT. */
+    private static final @NonNull Map<Class<? extends Throwable>, Boolean> NO_REINTENTABLES = Objects.requireNonNull(Map.of(
+            MensajeInvalidoException.class, false,
+            DeserializationException.class, false,
+            SerializationException.class, false));
 
     @Bean
     public NewTopic topicoDeadLetter(
@@ -45,7 +53,7 @@ public class KafkaErrorConfig {
             @Value("${vidasalud.kafka.reintentos.intervalo-ms}") long intervaloMs,
             @Value("${vidasalud.kafka.reintentos.maximo}") long maximo) {
 
-        DeadLetterPublishingRecoverer aDlt = new DeadLetterPublishingRecoverer(kafkaTemplate,
+        DeadLetterPublishingRecoverer aDlt = new DeadLetterPublishingRecoverer(Objects.requireNonNull(kafkaTemplate),
                 (registro, error) -> new TopicPartition(registro.topic() + sufijo, -1));
 
         DefaultErrorHandler manejador = new DefaultErrorHandler((registro, error) -> {
@@ -56,11 +64,7 @@ public class KafkaErrorConfig {
 
         // Estos errores no mejoran con reintentos: van directo al DLT. traverseCauses=true porque el listener
         // lanza la excepción envuelta en ListenerExecutionFailedException y la causa es la que define el tipo.
-        Map<Class<? extends Throwable>, Boolean> noReintentables = Map.of(
-                MensajeInvalidoException.class, false,
-                DeserializationException.class, false,
-                SerializationException.class, false);
-        manejador.setClassifications(noReintentables, true);
+        manejador.setClassifications(NO_REINTENTABLES, true);
         manejador.setRetryListeners((registro, error, intento) -> log.warn(
                 "Reintento {} del mensaje en {} (partición {}, offset {}): {}", intento, registro.topic(),
                 registro.partition(), registro.offset(), error.getMessage()));

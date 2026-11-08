@@ -53,20 +53,20 @@ public class ReporteService {
         }
         String clave = entrada.citaId() + ":" + entrada.tipo() + ":" + entrada.ocurridoEn();
         if (entradasAuditadas.add(clave)) {
-            auditadasPorTipo.merge(entrada.tipo(), 1L, Long::sum);
+            auditadasPorTipo.merge(entrada.tipo(), 1L, (a, b) -> a + b);
         }
     }
 
     /** Eventos del timeline por tipo (cuántas veces se registró cada cambio de estado). */
     public ResumenAuditoria auditoria() {
         Map<String, Long> porTipo = new TreeMap<>(auditadasPorTipo);
-        long total = porTipo.values().stream().mapToLong(Long::longValue).sum();
+        long total = porTipo.values().stream().mapToLong(cuenta -> cuenta).sum();
         return new ResumenAuditoria(total, porTipo);
     }
 
     public Kpis kpis() {
         Map<String, Long> porEstado = citas.values().stream()
-                .collect(Collectors.groupingBy(CitaResumen::estado, Collectors.counting()));
+                .collect(Collectors.groupingBy(resumen -> resumen.estado(), Collectors.counting()));
         long total = citas.size();
         long canceladas = porEstado.getOrDefault("CANCELADA", 0L);
         double tasaCancelacion = total == 0 ? 0.0 : Math.round(canceladas * 1000.0 / total) / 10.0;
@@ -77,11 +77,11 @@ public class ReporteService {
     public List<ConteoServicio> topServicios(int limite) {
         return citas.values().stream()
                 .filter(resumen -> resumen.servicioId() != null)
-                .collect(Collectors.groupingBy(CitaResumen::servicioId, Collectors.counting()))
+                .collect(Collectors.groupingBy(resumen -> resumen.servicioId(), Collectors.counting()))
                 .entrySet().stream()
                 .map(e -> new ConteoServicio(e.getKey(), e.getValue()))
-                .sorted(Comparator.comparingLong(ConteoServicio::citas).reversed()
-                        .thenComparing(ConteoServicio::servicioId))
+                .sorted(Comparator.comparingLong((ConteoServicio c) -> c.citas()).reversed()
+                        .thenComparing(c -> c.servicioId()))
                 .limit(limite)
                 .toList();
     }
