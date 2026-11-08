@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.listener.ConsumerSeekAware;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -41,7 +42,7 @@ public class TimelineListener implements ConsumerSeekAware {
     }
 
     @Override
-    public void onPartitionsAssigned(Map<TopicPartition, Long> asignaciones, ConsumerSeekCallback callback) {
+    public void onPartitionsAssigned(@NonNull Map<TopicPartition, Long> asignaciones, @NonNull ConsumerSeekCallback callback) {
         Set<TopicPartition> nuevas = asignaciones.keySet().stream()
                 .filter(tp -> reprocesadas.add(tp))
                 .collect(Collectors.toSet());
