@@ -12,6 +12,7 @@ import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.config.TopicBuilder;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.lang.NonNull;
 import org.springframework.kafka.listener.CommonErrorHandler;
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
@@ -30,7 +31,7 @@ public class TimelineKafkaConfig {
 
     @Bean
     public ConsumerFactory<String, EntradaAuditoria> timelineConsumerFactory(KafkaProperties propiedades) {
-        Map<String, Object> config = new HashMap<>(propiedades.buildConsumerProperties());
+        Map<String, Object> config = new HashMap<>(propiedades.buildConsumerProperties(null));
         // Los tipos los fija el código de este bean, no las propiedades globales (que apuntan a CitaEvento).
         config.remove("spring.json.value.default.type");
         config.remove("spring.deserializer.value.delegate.class");
@@ -47,8 +48,8 @@ public class TimelineKafkaConfig {
 
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, EntradaAuditoria> timelineContainerFactory(
-            ConsumerFactory<String, EntradaAuditoria> timelineConsumerFactory,
-            CommonErrorHandler errorHandler) {
+            @NonNull ConsumerFactory<String, EntradaAuditoria> timelineConsumerFactory,
+            @NonNull CommonErrorHandler errorHandler) {
         ConcurrentKafkaListenerContainerFactory<String, EntradaAuditoria> fabrica = new ConcurrentKafkaListenerContainerFactory<>();
         fabrica.setConsumerFactory(timelineConsumerFactory);
         fabrica.setCommonErrorHandler(errorHandler);
